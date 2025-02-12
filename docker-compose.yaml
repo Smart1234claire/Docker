@@ -1,0 +1,156 @@
+version: '3.7'
+
+# Définition des réseaux
+networks:
+  apache_network:
+    driver: bridge # reseau pour apache
+  backend_network:
+    driver: bridge # reseau pour les base de donnee
+  ha_network:
+    driver: bridge # reseau pour le ha entre les serveur et apache
+
+# Définition des services
+services:
+  # Serveur 1
+  apache1:
+    image: httpd:latest
+    container_name: apache1
+    ports:
+      - "8081:80"
+    networks:
+      - apache_network
+      - ha_network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  mysql1:
+    image: mysql:latest
+    container_name: mysql1
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: mydb
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    volumes:
+      - mysql_data1:/var/lib/mysql
+    networks:
+      - backend_network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  neo4j1:
+    image: neo4j:latest
+    container_name: neo4j1
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      NEO4J_AUTH: "neo4j/password"
+    volumes:
+      - neo4j_data1:/data
+    networks:
+      - backend_network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  # Serveur 2
+  apache2:
+    image: httpd:latest
+    container_name: apache2
+    ports:
+      - "8082:80"
+    networks:
+      - apache_network
+      - ha_network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  mysql2:
+    image: mysql:latest
+    container_name: mysql2
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword2
+      MYSQL_DATABASE: mydb2
+      MYSQL_USER: user2
+      MYSQL_PASSWORD: password2
+    volumes:
+      - mysql_data2:/var/lib/mysql
+    networks:
+      - backend_network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  neo4j2:
+    image: neo4j:latest
+    container_name: neo4j2
+    ports:
+      - "7475:7474"
+      - "7688:7687"
+    environment:
+      NEO4J_AUTH: "neo4j/password"
+    volumes:
+      - neo4j_data2:/data
+    networks:
+      - backend_network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  # Load Balancer (Nginx)
+  load_balancer:
+    image: nginx:latest
+    container_name: load_balancer
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    networks:
+      - apache_network
+      - ha_network
+    deploy:
+      replicas: 1
+
+# Volumes persistants pour les bases de données (stockés sur le disque C:)
+volumes:
+  mysql_data1:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: C:/Docker/data/mysql1
+
+  mysql_data2:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: C:/Docker/data/mysql2
+
+  neo4j_data1:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: C:/Docker/data/neo4j1
+
+  neo4j_data2:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: C:/Docker/data/neo4j2
